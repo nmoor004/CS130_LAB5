@@ -136,19 +136,23 @@ void rasterize_triangle(driver_state& state, const data_geometry& v0,
     float ALPHA;
     float BETA;
     float GAMMA;
+    float fragmentData[state.floats_per_vertex];
+    data_output dOut;
+    data_fragment dFrag;
+
     //Save the vertices as ABC so the formulas are easier
     int A[2];
     int B[2];
     int C[2];
 
-    A[0] = static_cast<int>((state.image_width / 2.0) * v0.gl_Position[0] + ((state.image_width / 2.0) - 0.5));
-    A[1] = static_cast<int>((state.image_height / 2.0) * v0.gl_Position[1] + ((state.image_height / 2.0) - 0.5));
+    A[0] = static_cast<int>((state.image_width / 2.0) * v0.gl_Position[0]/v0.gl_Position[3] + ((state.image_width / 2.0) - 0.5));
+    A[1] = static_cast<int>((state.image_height / 2.0) * v0.gl_Position[1]/v0.gl_Position[3] + ((state.image_height / 2.0) - 0.5));
 
-    B[0] = static_cast<int>((state.image_width / 2.0) * v1.gl_Position[0] + ((state.image_width / 2.0) - 0.5));
-    B[1] = static_cast<int>((state.image_height / 2.0) * v1.gl_Position[1] + ((state.image_height / 2.0) - 0.5));
+    B[0] = static_cast<int>((state.image_width / 2.0) * v1.gl_Position[0]/v1.gl_Position[3] + ((state.image_width / 2.0) - 0.5));
+    B[1] = static_cast<int>((state.image_height / 2.0) * v1.gl_Position[1]/v1.gl_Position[3] + ((state.image_height / 2.0) - 0.5));
 
-    C[0] = static_cast<int>((state.image_width / 2.0) * v2.gl_Position[0] + ((state.image_width / 2.0) - 0.5));
-    C[1] = static_cast<int>((state.image_height / 2.0) * v2.gl_Position[1] + ((state.image_height / 2.0) - 0.5));
+    C[0] = static_cast<int>((state.image_width / 2.0) * v2.gl_Position[0]/v2.gl_Position[3] + ((state.image_width / 2.0) - 0.5));
+    C[1] = static_cast<int>((state.image_height / 2.0) * v2.gl_Position[1]/v2.gl_Position[3] + ((state.image_height / 2.0) - 0.5));
 
 
 
@@ -182,17 +186,29 @@ void rasterize_triangle(driver_state& state, const data_geometry& v0,
                      )/2)/totalArea;
 
             if (ALPHA >= 0 && BETA >= 0 && GAMMA >= 0) {
-
                 if (myDebug) {std::cout << "\nAlpha Beta Gamma >= 0 for: " << "      ALPHA: " << ALPHA << " BETA: " << BETA << " GAMMA: " << GAMMA << "\n";
                 std::cout << "X: " << i << "   Y: " << j << "\n";}
 
-                state.image_color[j*state.image_width + i] = make_pixel(255,255,255);
+                for (int k = 0; k < state.floats_per_vertex; k++) {
+                    if (state.interp_rules[k] == interp_type::flat) {
+                        fragmentData[k] = v0.data[k];
+                    }
+                    else if (state.interp_rules[k] == interp_type::noperspective) {
+                        fragmentData[k] =   ALPHA * v0.data[k]
+                                            + BETA * v1.data[k]
+                                            + GAMMA * v2.data[k];
+                    }
+                }
+
+                dFrag.data = fragmentData;
+                state.fragment_shader(dFrag, dOut, state.uniform_data);
+               //state.image_color[j*state.image_width + i] = make_pixel(255,255,255);
+                state.image_color[j*state.image_width + i] = make_pixel(dOut.output_color[0]*255, dOut.output_color[1]*255, dOut.output_color[2]*255);
             }
         }
     }
 
     if (myDebug) {std::cout << "state.image_width: " << state.image_width << "    state.image_height: " << state.image_height << "\n";}
-
 
     //std::cout<<"TODO: implement rasterization"<<std::endl;
 }
